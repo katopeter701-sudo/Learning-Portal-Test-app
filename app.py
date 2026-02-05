@@ -13,9 +13,14 @@ except Exception:
     st.error("Database Connection Failed.")
     st.stop()
 
-# 2. FETCH SETTINGS (Background Image)
-bg_query = supabase.table("portal_settings").select("login_bg_url").eq("id", 1).execute()
-bg_url = bg_query.data[0]['login_bg_url'] if bg_query.data else ""
+# 2. SAFE FETCH SETTINGS
+bg_url = "https://images.unsplash.com/photo-1497366216548-37526070297c" # Default backup
+try:
+    bg_query = supabase.table("portal_settings").select("login_bg_url").eq("id", 1).execute()
+    if bg_query.data:
+        bg_url = bg_query.data[0]['login_bg_url']
+except Exception:
+    pass 
 
 # 3. UI CONFIG & SELECTIVE STYLING
 st.set_page_config(page_title="Flux", layout="wide")
@@ -27,11 +32,13 @@ if not st.session_state.get('logged_in', False):
         .stApp {{
             background-image: url("{bg_url}");
             background-size: cover;
+            background-attachment: fixed;
         }}
         .login-box {{
             background-color: rgba(255, 255, 255, 0.9);
-            padding: 30px;
+            padding: 40px;
             border-radius: 15px;
+            box-shadow: 0px 4px 15px rgba(0,0,0,0.3);
         }}
     </style>
     """, unsafe_allow_html=True)
@@ -41,7 +48,7 @@ st.markdown("""
     .flux-font {
         font-family: "Comic Sans MS", "Comic Sans", cursive, sans-serif;
         font-weight: bold;
-        font-size: 1.0em; /* Smaller font */
+        font-size: 0.9em; /* Smaller font */
         color: black;    /* Black color */
     }
     .footer { position: fixed; left: 0; bottom: 0; width: 100%; text-align: center; padding: 10px; color: #666; font-size: 14px; background: white; border-top: 1px solid #eee; z-index: 999; }
@@ -55,11 +62,11 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
-    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("<br><br><br>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
         st.markdown('<div class="login-box">', unsafe_allow_html=True)
-        st.markdown("<h1 style='text-align: center;'><span class='flux-font'>Flux</span></h1>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center;'><span class='flux-font'>Flux</span></h2>", unsafe_allow_html=True)
         st.text_input("Username", key="l_user")
         st.text_input("Password", type="password", key="l_pass")
         if st.button("Login", use_container_width=True) or st.button("Skip & Browse", use_container_width=True):
@@ -69,7 +76,7 @@ if not st.session_state.logged_in:
     st.stop()
 
 # 5. SIDEBAR NAVIGATION
-role = st.sidebar.radio("Navigation", ["Student Portal", "Admin Dashboard", "President Board"])
+role = st.sidebar.radio("Navigation", ["Student Portal", "Admin Dashboard"])
 
 # --- ADMIN DASHBOARD ---
 if role == "Admin Dashboard":
@@ -85,7 +92,7 @@ if role == "Admin Dashboard":
         st.subheader("Login Page Customization")
         new_bg = st.text_input("New Background Image URL", value=bg_url)
         if st.button("Update Background"):
-            supabase.table("portal_settings").update({"login_bg_url": new_bg}).eq("id", 1).execute()
+            supabase.table("portal_settings").upsert({"id": 1, "login_bg_url": new_bg}).execute()
             st.success("Background Updated! Log out to see changes.")
 
     with t1:
