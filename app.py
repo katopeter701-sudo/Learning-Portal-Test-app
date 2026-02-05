@@ -3,11 +3,11 @@ import pandas as pd
 from supabase import create_client
 import numpy as np
 
-# 1. DATABASE CONNECTION - Update these with your real Supabase credentials
+# 1. DATABASE CONNECTION
 PROJECT_ID = "uxtmgdenwfyuwhezcleh"
 SUPABASE_URL = f"https://{PROJECT_ID}.supabase.co"
-# TIP: Double-check this key in your Supabase Dashboard!
-SUPABASE_KEY = "REPLACE_WITH_YOUR_ACTUAL_ANON_PUBLIC_KEY"
+# IMPORTANT: Replace this with your ACTUAL Anon/Public Key from Supabase Settings
+SUPABASE_KEY = "sb_publishable_1BIwMEH8FVDv7fFaf_31uA_9FqAJr0-" 
 
 try:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -19,7 +19,7 @@ if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'user_type' not in st.session_state: st.session_state.user_type = None
 if 'page' not in st.session_state: st.session_state.page = "selector"
 
-# 3. YOUTUBE EMBED ENGINE (Crucial for your CSV playlists)
+# 3. YOUTUBE EMBED ENGINE (Fixed to show your playlists)
 def get_embed_url(url):
     if not url or not isinstance(url, str): return None
     if "list=" in url:
@@ -40,7 +40,6 @@ st.markdown("""
 <style>
     header[data-testid="stHeader"] { visibility: hidden; height: 0%; }
     
-    /* Login Box Styles */
     .login-box {
         background-color: white; padding: 40px; border-radius: 15px;
         box-shadow: 0px 10px 40px rgba(0,0,0,0.3); max-width: 450px; margin: auto;
@@ -60,13 +59,11 @@ st.markdown("""
         font-weight: bold !important;
     }
 
-    /* Hints Visibility (Black/White context) */
     .stTextInput label { color: black !important; font-weight: bold !important; }
-    input::placeholder { color: #666 !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# 5. AUTHENTICATION PAGES
+# 5. AUTHENTICATION
 if not st.session_state.logged_in:
     st.markdown("<br><br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 1.5, 1])
@@ -86,17 +83,15 @@ if not st.session_state.logged_in:
                 st.session_state.user_type = "public"; st.session_state.logged_in = True; st.rerun()
 
         elif st.session_state.page == "login":
-            u_email = st.text_input("Email", placeholder="Enter your email")
+            u_email = st.text_input("Email")
             if st.button("Login", type="primary", use_container_width=True):
-                # We use a try-except here because of your 401 error
                 try:
                     user = supabase.table("users").select("*").eq("email", u_email).execute()
                     if user.data:
                         st.session_state.user_type = "kiu" if user.data[0]['is_kiu_student'] else "public"
                         st.session_state.logged_in = True; st.rerun()
                     else: st.error("Email not found.")
-                except Exception as e:
-                    st.error(f"Database Error: {e}")
+                except Exception as e: st.error(f"Error: {e}")
             if st.button("Back"): st.session_state.page = "selector"; st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
@@ -113,7 +108,7 @@ with st.sidebar:
 if "Administrator" in role:
     if st.sidebar.text_input("Password", type="password") == "flux":
         prog = st.text_input("Program Name")
-        file = st.file_uploader("Bulk Upload CSV/Excel")
+        file = st.file_uploader("Upload Data")
         if file and prog and st.button("Start Upload"):
             df = pd.read_excel(file) if "xlsx" in file.name else pd.read_csv(file)
             df = df.replace({np.nan: None})
@@ -125,4 +120,30 @@ if "Administrator" in role:
                         "video_url": str(row.get('Embeddable YouTube Video Link', '')),
                         "notes_url": str(row.get('Link to Google docs Document', ''))
                     }).execute()
-                except Exception as e: st.warning(f"Row failed: {e
+                except Exception as e:
+                    st.warning(f"Row failed: {e}")
+            st.success("Uploaded!")
+
+# --- LEARNING CENTER ---
+else:
+    st.title("My Courses")
+    try:
+        res = supabase.table("materials").select("*").execute()
+        if res.data:
+            df = pd.DataFrame(res.data)
+            for prog in df['course_program'].unique():
+                with st.expander(f"📚 {prog}", expanded=True):
+                    items = df[df['course_program'] == prog]
+                    for _, item in items.iterrows():
+                        st.subheader(item.get('course_name'))
+                        col1, col2 = st.columns([2, 1])
+                        with col1:
+                            v_link = get_embed_url(item.get('video_url'))
+                            if v_link: st.video(v_link)
+                            else: st.info("No video link found.")
+                        with col2:
+                            if item.get('notes_url'):
+                                st.link_button("📂 View Notes", item['notes_url'], use_container_width=True)
+                        st.write("---")
+    except Exception as e:
+        st.error(f"Error loading content: {e}")
