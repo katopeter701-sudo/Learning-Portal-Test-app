@@ -3,15 +3,14 @@ import pandas as pd
 from supabase import create_client
 
 # 1. DATABASE CONNECTION
-# Hard-coded credentials as requested
-[cite_start]PROJECT_ID = "uxtmgdenwfyuwhezcleh" [cite: 5]
-[cite_start]SUPABASE_URL = f"https://{PROJECT_ID}.supabase.co" [cite: 6]
-[cite_start]SUPABASE_KEY = "sb_publishable_1BIwMEH8FVDv7fFafz31uA_9FqAJr0-" [cite: 7]
+PROJECT_ID = "uxtmgdenwfyuwhezcleh"
+SUPABASE_URL = f"https://{PROJECT_ID}.supabase.co"
+SUPABASE_KEY = "sb_publishable_1BIwMEH8FVDv7fFafz31uA_9FqAJr0-"
 
 try:
-    [cite_start]supabase = create_client(SUPABASE_URL, SUPABASE_KEY) [cite: 9]
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 except Exception:
-    [cite_start]st.error("Database Connection Failed. Check your Supabase credentials.") [cite: 11]
+    st.error("Database Connection Failed. Check your Supabase credentials.")
     st.stop()
 
 # 2. UI CONFIG & CSS STYLING
@@ -36,8 +35,7 @@ if not st.session_state.logged_in:
             st.subheader("Login Access")
             st.text_input("Username")
             st.text_input("Password", type="password")
-            # FIXED: String is now on one line to prevent the SyntaxError
-            if st.button("Login", use_container_width=True) or st.button(" Skip & Browse", use_container_width=True): 
+            if st.button("Login", use_container_width=True) or st.button("Skip & Browse", use_container_width=True):
                 st.session_state.logged_in = True
                 st.rerun()
     st.markdown('<div class="footer">Built by KMT Dynamics</div>', unsafe_allow_html=True)
