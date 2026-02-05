@@ -6,7 +6,7 @@ import numpy as np
 # 1. DATABASE CONNECTION
 PROJECT_ID = "uxtmgdenwfyuwhezcleh"
 SUPABASE_URL = f"https://{PROJECT_ID}.supabase.co"
-SUPABASE_KEY = "sb_publishable_1BIwMEH8FVDv7fFaf_31uA_9FqAJr0-"
+SUPABASE_KEY = "sb_publishable_1BIwMEH8FVDv7fFafz31uA_9FqAJr0-"
 
 try:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -31,6 +31,12 @@ st.set_page_config(page_title="Flux | Portal", layout="wide")
 
 st.markdown(f"""
 <style>
+    /* REMOVE TOP WHITE BAR */
+    header[data-testid="stHeader"] {{
+        visibility: hidden;
+        height: 0%;
+    }}
+    
     /* Global Background */
     .stApp {{ background-image: url("{bg_url}"); background-size: cover; background-attachment: fixed; }}
     
@@ -51,9 +57,9 @@ st.markdown(f"""
         display: inline-block; margin-bottom: 30px;
     }}
 
-    /* HINTS VISIBILITY: Placeholder and Label contrast */
+    /* HINTS VISIBILITY */
     .stTextInput label {{ color: black !important; font-weight: bold !important; }}
-    input::placeholder {{ color: #666 !important; opacity: 1; }} /* Dark hint in white box */
+    input::placeholder {{ color: #666 !important; opacity: 1; }} 
     
     /* Modernized Sidebar */
     [data-testid="stSidebar"] {{
@@ -61,28 +67,26 @@ st.markdown(f"""
         backdrop-filter: blur(10px);
         border-right: 1px solid rgba(0,0,0,0.05);
     }}
-    .stRadio div[role="radiogroup"] {{ gap: 10px; }}
 </style>
 """, unsafe_allow_html=True)
 
 # 5. AUTHENTICATION PAGES
 if not st.session_state.logged_in:
+    st.markdown("<br><br><br>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 1.5, 1])
     with col2:
         st.markdown('<div class="login-box">', unsafe_allow_html=True)
         st.markdown('<div class="kmt-header">Built by KMT dynamics Co Ltd</div>', unsafe_allow_html=True)
         st.markdown('<div class="flux-box">flux</div>', unsafe_allow_html=True)
         
-        # --- Selector Page ---
         if st.session_state.page == "selector":
             if st.button("Sign In", use_container_width=True): 
                 st.session_state.page = "login"; st.rerun()
             if st.button("Register / Sign Up", use_container_width=True): 
                 st.session_state.page = "signup"; st.rerun()
-            if st.button("Skip to Public Courses", use_container_width=True): 
+            if st.button("Guest Access", use_container_width=True): 
                 st.session_state.user_type = "public"; st.session_state.logged_in = True; st.rerun()
 
-        # --- Sign Up Page ---
         elif st.session_state.page == "signup":
             name = st.text_input("Full Name", placeholder="Enter full name")
             email = st.text_input("Email Address", placeholder="e.g. name@email.com")
@@ -90,14 +94,15 @@ if not st.session_state.logged_in:
             reg = st.text_input("Registration Number", placeholder="202X/XX/XXX") if is_kiu else ""
             if st.button("Create Account", type="primary", use_container_width=True):
                 if name and email:
-                    supabase.table("users").insert({
-                        "full_name": name, "email": email, "registration_number": reg, "is_kiu_student": is_kiu
-                    }).execute()
-                    st.success("Account created! Please login.")
-                    st.session_state.page = "login"; st.rerun()
+                    try:
+                        supabase.table("users").insert({
+                            "full_name": name, "email": email, "registration_number": reg, "is_kiu_student": is_kiu
+                        }).execute()
+                        st.success("Account created!")
+                        st.session_state.page = "login"; st.rerun()
+                    except: st.error("Registration failed.")
             if st.button("Back"): st.session_state.page = "selector"; st.rerun()
 
-        # --- Login Page ---
         elif st.session_state.page == "login":
             u_email = st.text_input("Email", placeholder="Enter registered email")
             if st.button("Sign In", type="primary", use_container_width=True):
@@ -105,7 +110,7 @@ if not st.session_state.logged_in:
                 if user.data:
                     st.session_state.user_type = "kiu" if user.data[0]['is_kiu_student'] else "public"
                     st.session_state.logged_in = True; st.rerun()
-                else: st.error("Email not found. Please Sign Up.")
+                else: st.error("Email not found.")
             if st.button("Back"): st.session_state.page = "selector"; st.rerun()
         
         st.markdown('</div>', unsafe_allow_html=True)
@@ -114,27 +119,24 @@ if not st.session_state.logged_in:
 # 6. MAIN APP INTERFACE
 with st.sidebar:
     st.markdown("### 🌊 Flux Navigator")
-    st.write(f"Access: **{st.session_state.user_type.upper() if st.session_state.user_type else 'GUEST'}**")
     st.write("---")
     role = st.radio("Menu", ["📖 Learning Center", "🛠 Administrator"], label_visibility="collapsed")
     st.write("---")
-    if st.button("Logout"):
+    if st.button("Logout", use_container_width=True):
         st.session_state.logged_in = False; st.session_state.page = "selector"; st.rerun()
 
 # --- ADMIN CONSOLE ---
 if "Administrator" in role:
     if st.sidebar.text_input("Admin Password", type="password") != "flux": st.stop()
     
-    st.header("Admin Management")
     t1, t2 = st.tabs(["Bulk Upload Content", "Portal Design"])
     
     with t1:
-        prog_name = st.text_input("Program Name (e.g. ACCA)")
-        tile_img = st.text_input("Course Tile Image URL", value="https://images.unsplash.com/photo-1516321318423-f06f85e504b3")
+        prog_name = st.text_input("Program Name")
+        tile_img = st.text_input("Course Tile Image URL")
         file = st.file_uploader("Upload CSV/Excel", type=['xlsx', 'csv'])
         if file and prog_name and st.button("Start Bulk Upload"):
             df = pd.read_excel(file) if "xlsx" in file.name else pd.read_csv(file)
-            # FIX: Replace NaN to avoid APIError
             df = df.replace({np.nan: None}) 
             for _, row in df.iterrows():
                 try:
@@ -146,7 +148,7 @@ if "Administrator" in role:
                         "notes_url": str(row.get('Link to Google docs Document', '')),
                         "image_url": tile_img
                     }).execute()
-                except Exception: continue
+                except: continue
             st.success("Upload successful!")
 
     with t2:
@@ -167,7 +169,6 @@ else:
             cols = st.columns(3)
             for i, (_, item) in enumerate(items.iterrows()):
                 with cols[i % 3]:
-                    # FIXED: Added get() to prevent KeyError
                     week = item.get('week', '1')
                     name = item.get('course_name', 'Lesson')
                     with st.expander(f"Week {week}: {name}"):
