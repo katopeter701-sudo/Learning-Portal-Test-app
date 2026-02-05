@@ -3,27 +3,29 @@ import pandas as pd
 from supabase import create_client
 
 # 1. DATABASE CONNECTION
-PROJECT_ID = "uxtmgdenwfyuwhezcleh"
-SUPABASE_URL = f"https://{PROJECT_ID}.supabase.co"
-SUPABASE_KEY = "sb_publishable_1BIwMEH8FVDv7fFafz31uA_9FqAJr0-"
+[cite_start]PROJECT_ID = "uxtmgdenwfyuwhezcleh" [cite: 5]
+[cite_start]SUPABASE_URL = f"https://{PROJECT_ID}.supabase.co" [cite: 6]
+[cite_start]SUPABASE_KEY = "sb_publishable_1BIwMEH8FVDv7fFafz31uA_9FqAJr0-" [cite: 7]
 
 try:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    [cite_start]supabase = create_client(SUPABASE_URL, SUPABASE_KEY) [cite: 9]
 except Exception:
-    st.error("Database Connection Failed. Check credentials.")
+    st.error("Database Connection Failed.")
     st.stop()
 
-# 2. UI CONFIG & COMIC SANS STYLING
-st.set_page_config(page_title="Flux Learning Portal", layout="wide")
+# 2. UI CONFIG & SELECTIVE STYLING
+st.set_page_config(page_title="Flux Portal", layout="wide")
 st.markdown("""
 <style>
-    /* Global Font Change to Comic Sans */
-    html, body, [class*="st-"] {
+    /* Only the word 'Flux' gets Comic Sans */
+    .flux-font {
         font-family: "Comic Sans MS", "Comic Sans", cursive, sans-serif;
+        font-weight: bold;
     }
     .footer { position: fixed; left: 0; bottom: 0; width: 100%; text-align: center; padding: 10px; color: #666; font-size: 14px; background: white; border-top: 1px solid #eee; z-index: 999; }
     .video-container { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; background: #000; border-radius: 8px; margin-bottom: 10px; }
     .video-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+    .course-tile { border-radius: 10px; overflow: hidden; margin-bottom: 20px; border: 1px solid #ddd; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -32,7 +34,7 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
-    st.markdown("<h1 style='text-align: center; margin-top: 50px;'>🚀 Flux Portal</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; margin-top: 50px;'><span class='flux-font'>Flux</span> Portal</h1>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 1.5, 1])
     with col2:
         with st.container(border=True):
@@ -47,9 +49,14 @@ if not st.session_state.logged_in:
 # 4. SIDEBAR NAVIGATION
 role = st.sidebar.radio("Navigation", ["Student Portal", "Admin Dashboard", "President Board"])
 
-# --- ADMIN DASHBOARD ---
+# --- ADMIN DASHBOARD (Password Protected) ---
 if role == "Admin Dashboard":
-    st.header("Flux Management Console")
+    admin_pw = st.sidebar.text_input("Admin Password", type="password")
+    if admin_pw != "flux":
+        st.warning("Please enter the correct Admin Password in the sidebar to access this section.")
+        st.stop()
+
+    st.header(f"Management Console")
     t1, t2, t3 = st.tabs(["Add Entry", "Bulk Upload", "Delete Content"])
     
     with t1:
@@ -57,16 +64,19 @@ if role == "Admin Dashboard":
             p = st.text_input("Course Name")
             t = st.text_input("Module Topic")
             w = st.number_input("Week Number", 1, 15)
+            img = st.text_input("Google Drive Image URL (for Tile)")
             v = st.text_input("YouTube/Slide Link")
             n = st.text_input("Notes Link")
             if st.form_submit_button("Save to Portal"):
                 supabase.table("materials").insert({
-                    "course_program": p, "course_name": t, "week": w, "video_url": v, "notes_url": n
+                    "course_program": p, "course_name": t, "week": w, 
+                    "video_url": v, "notes_url": n, "image_url": img
                 }).execute()
                 st.success("Module saved!")
 
     with t2:
         target = st.text_input("Target Course Name")
+        default_img = st.text_input("Default Image URL for this batch")
         f = st.file_uploader("Upload CSV/Excel", type=["xlsx", "csv"])
         if f and target and st.button("Start Bulk Upload"):
             df = pd.read_excel(f) if "xlsx" in f.name else pd.read_csv(f)
@@ -76,7 +86,8 @@ if role == "Admin Dashboard":
                     "course_name": str(row.get('Topic Covered', "Untitled")),
                     "week": int(row.get('Week', 1)),
                     "video_url": str(row.get('Embeddable YouTube Video Link', "")),
-                    "notes_url": str(row.get('link to Google docs Document', ""))
+                    "notes_url": str(row.get('link to Google docs Document', "")),
+                    "image_url": default_img
                 }).execute()
             st.success("Bulk Upload Finished!")
 
@@ -85,48 +96,48 @@ if role == "Admin Dashboard":
         if data.data:
             for item in data.data:
                 c1, c2 = st.columns([4, 1])
-                # FIXED KeyError by using .get()
-                prog = item.get('course_program', 'Unknown')
-                wk = item.get('week', '?')
-                name = item.get('course_name', 'No Name')
-                c1.write(f"**{prog}** | Wk {wk}: {name}")
+                c1.write(f"**{item.get('course_program')}** | Wk {item.get('week')}: {item.get('course_name')}")
                 if c2.button("Delete", key=f"del_{item['id']}"):
                     supabase.table("materials").delete().eq("id", item['id']).execute()
                     st.rerun()
 
 # --- STUDENT PORTAL ---
 elif role == "Student Portal":
-    st.title("🌊 Flux Learning Modules")
+    st.markdown("<h1><span class='flux-font'>Flux</span> Learning Modules</h1>", unsafe_allow_html=True)
     
-    # Keyword Search Logic
-    search = st.text_input("🔍 Search by Course, Topic, or Keywords").strip()
+    search = st.text_input("Search by Course, Topic, or Keywords").strip()
     
-    # DISPLAY ALL UNIQUE COURSE TITLES UPLOADED
     st.write("### Available Courses")
-    course_list = supabase.table("materials").select("course_program").execute()
-    if course_list.data:
-        unique_courses = sorted(list(set([c['course_program'] for c in course_list.data if c['course_program']])))
-        st.caption(" • ".join(unique_courses))
-    
+    course_data = supabase.table("materials").select("course_program, image_url").execute()
+    if course_data.data:
+        # Create unique list of courses with their associated images
+        unique_courses = {}
+        for c in course_data.data:
+            if c['course_program'] not in unique_courses:
+                unique_courses[c['course_program']] = c.get('image_url')
+
+        # Display course titles as "Tiles"
+        cols = st.columns(3)
+        for i, (name, img_url) in enumerate(unique_courses.items()):
+            with cols[i % 3]:
+                if img_url:
+                    st.image(img_url, use_container_width=True)
+                st.caption(f"**{name}**")
+
     if search:
-        # Search multiple columns for the keyword
         res = supabase.table("materials").select("*")\
             .or_(f"course_program.ilike.%{search}%,course_name.ilike.%{search}%")\
             .order("week").execute()
             
         if res.data:
             for item in res.data:
-                with st.expander(f"Week {item.get('week', '1')} - {item.get('course_name', 'Module')}"):
-                    st.write(f"**Course:** {item.get('course_program')}")
-                    raw_url = str(item.get('video_url', ""))
-                    if "youtube.com" in raw_url or "youtu.be" in raw_url:
-                        v_id = raw_url.split("v=")[1].split("&")[0] if "v=" in raw_url else raw_url.split("/")[-1]
-                        st.markdown(f'<div class="video-container"><iframe src="https://www.youtube.com/embed/{v_id}" allowfullscreen></iframe></div>', unsafe_allow_html=True)
+                with st.expander(f"Week {item.get('week')} - {item.get('course_name')}"):
+                    if item.get('video_url'):
+                        raw_url = item['video_url']
+                        if "youtube.com" in raw_url or "youtu.be" in raw_url:
+                            v_id = raw_url.split("v=")[1].split("&")[0] if "v=" in raw_url else raw_url.split("/")[-1]
+                            st.markdown(f'<div class="video-container"><iframe src="https://www.youtube.com/embed/{v_id}" allowfullscreen></iframe></div>', unsafe_allow_html=True)
                     if item.get('notes_url'):
                         st.link_button("Read Lecture Notes", item['notes_url'])
-        else:
-            st.info("No matches found.")
-    else:
-        st.info("Enter a keyword above to see specific modules.")
 
 st.markdown('<div class="footer">Built by KMT Dynamics</div>', unsafe_allow_html=True)
