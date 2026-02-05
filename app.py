@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 from supabase import create_client
 import numpy as np
-import re
 
 # 1. DATABASE CONNECTION
 PROJECT_ID = "uxtmgdenwfyuwhezcleh"
@@ -20,159 +19,169 @@ if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'user_type' not in st.session_state: st.session_state.user_type = None
 if 'page' not in st.session_state: st.session_state.page = "selector"
 
-# 3. HELPER: FIX YOUTUBE LINKS FOR EMBEDDING
-def fix_youtube_link(url):
-    if not url or not isinstance(url, str): return None
-    # Convert watch?v= or playlist?list= to embed format if possible
+# 3. YOUTUBE EMBED FIXER
+def get_embed_url(url):
+    if not url or not isinstance(url, str):
+        return None
+    # Handle Playlists
     if "list=" in url:
-        playlist_id = url.split("list=")[-1]
+        playlist_id = url.split("list=")[-1].split("&")[0]
         return f"https://www.youtube.com/embed/videoseries?list={playlist_id}"
+    # Handle Standard Videos
     if "watch?v=" in url:
         video_id = url.split("v=")[-1].split("&")[0]
         return f"https://www.youtube.com/embed/{video_id}"
+    # Handle Shortened Links
+    if "youtu.be/" in url:
+        video_id = url.split("youtu.be/")[-1].split("?")[0]
+        return f"https://www.youtube.com/embed/{video_id}"
     return url
 
-# 4. MODERN UI STYLING
-st.set_page_config(page_title="Flux | Portal", layout="wide")
+# 4. MODERN UI & GLASS NAVIGATION STYLING
+st.set_page_config(page_title="Flux | Learning Portal", layout="wide")
 
 st.markdown("""
 <style>
     header[data-testid="stHeader"] { visibility: hidden; height: 0%; }
-    .stApp { background-color: #f8f9fa; }
+    .stApp { background-color: #f0f2f5; }
     
-    /* Login Branding */
+    /* Login Box Styling */
     .login-box {
-        background-color: white; padding: 40px; border-radius: 20px;
-        box-shadow: 0px 10px 40px rgba(0,0,0,0.2); max-width: 450px; margin: auto;
-        text-align: center; border: 1px solid #eee;
+        background-color: white; padding: 50px; border-radius: 20px;
+        box-shadow: 0px 20px 60px rgba(0,0,0,0.3); max-width: 480px; margin: auto;
+        text-align: center; border: 1px solid rgba(0,0,0,0.05);
     }
-    .kmt-header { font-size: 11px; color: #888; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1.5px; }
+    .kmt-header { font-size: 10px; color: #aaa; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; }
     .flux-box { 
-        background-color: #000; color: #fff; padding: 12px 30px; border-radius: 8px;
-        font-family: 'Courier New', Courier, monospace; font-weight: bold; font-size: 2.5em;
-        display: inline-block; margin-bottom: 30px;
+        background-color: #000; color: #fff; padding: 15px 35px; border-radius: 10px;
+        font-family: 'Trebuchet MS', sans-serif; font-weight: bold; font-size: 2.8em;
+        display: inline-block; margin-bottom: 40px;
     }
 
-    /* KIU Green Button */
-    .kiu-btn div[data-testid="stButton"] button {
+    /* KIU GREEN SIGN UP BUTTON */
+    .kiu-green-btn div[data-testid="stButton"] button {
         background-color: #28a745 !important;
         color: white !important; border: none !important;
-        height: 50px; font-weight: bold !important; border-radius: 10px !important;
+        height: 55px; font-weight: bold !important; border-radius: 12px !important;
+        font-size: 1.1em !important;
     }
 
-    /* Course Display Cards */
-    .course-header {
-        background: #000; color: #fff; padding: 15px 25px;
-        border-radius: 12px 12px 0 0; margin-top: 20px;
+    /* COURSE CONTENT STRUCTURE */
+    .course-title-bar {
+        background: #000; color: white; padding: 20px;
+        border-radius: 15px 15px 0 0; margin-top: 30px;
+        font-size: 1.6em; font-weight: bold;
     }
-    .content-card {
-        background: white; padding: 25px; border-radius: 0 0 12px 12px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 30px;
-        border: 1px solid #eee;
+    .topic-container {
+        background: white; padding: 30px; border-radius: 0 0 15px 15px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.05); margin-bottom: 40px;
     }
+    .topic-name { font-size: 1.4em; font-weight: 700; color: #1a1a1b; margin-bottom: 15px; }
     
-    /* Input Labels */
-    .stTextInput label { color: black !important; font-weight: 600 !important; }
-    input::placeholder { color: #999 !important; }
+    /* MODERN SIDEBAR */
+    [data-testid="stSidebar"] {
+        background: rgba(255, 255, 255, 0.9) !important;
+        backdrop-filter: blur(10px);
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # 5. AUTHENTICATION PAGES
 if not st.session_state.logged_in:
     st.markdown("<br><br><br>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 1.5, 1])
-    with col2:
+    c1, c2, c3 = st.columns([1, 1.8, 1])
+    with c2:
         st.markdown('<div class="login-box">', unsafe_allow_html=True)
         st.markdown('<div class="kmt-header">Built by KMT dynamics Co Ltd</div>', unsafe_allow_html=True)
         st.markdown('<div class="flux-box">flux</div>', unsafe_allow_html=True)
         
         if st.session_state.page == "selector":
-            if st.button("Sign In", use_container_width=True): 
+            if st.button("Sign In to Portal", use_container_width=True): 
                 st.session_state.page = "login"; st.rerun()
-            st.markdown('<div class="kiu-btn">', unsafe_allow_html=True)
-            if st.button("Register as KIU Student", use_container_width=True): 
+            st.markdown('<div class="kiu-green-btn">', unsafe_allow_html=True)
+            if st.button("Sign Up as KIU Student", use_container_width=True): 
                 st.session_state.page = "signup"; st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
-            if st.button("Public Guest Access", use_container_width=True): 
+            if st.button("Explore Public Content", use_container_width=True): 
                 st.session_state.user_type = "public"; st.session_state.logged_in = True; st.rerun()
 
         elif st.session_state.page == "signup":
-            name = st.text_input("Full Name", placeholder="e.g. John Doe")
-            email = st.text_input("Email Address")
-            reg = st.text_input("KIU Registration No.")
-            if st.button("Complete Sign Up", type="primary", use_container_width=True):
+            name = st.text_input("Full Name")
+            email = st.text_input("Email")
+            reg = st.text_input("Registration Number")
+            if st.button("Complete Registration", type="primary", use_container_width=True):
                 supabase.table("users").insert({"full_name": name, "email": email, "registration_number": reg, "is_kiu_student": True}).execute()
-                st.success("Account Created! Please Login.")
                 st.session_state.page = "login"; st.rerun()
-            if st.button("← Back"): st.session_state.page = "selector"; st.rerun()
+            if st.button("Back"): st.session_state.page = "selector"; st.rerun()
 
         elif st.session_state.page == "login":
-            u_email = st.text_input("Email", placeholder="Enter your email")
-            if st.button("Enter Portal", type="primary", use_container_width=True):
+            u_email = st.text_input("Enter Email")
+            if st.button("Login", type="primary", use_container_width=True):
                 user = supabase.table("users").select("*").eq("email", u_email).execute()
                 if user.data:
                     st.session_state.user_type = "kiu" if user.data[0]['is_kiu_student'] else "public"
                     st.session_state.logged_in = True; st.rerun()
-                else: st.error("Account not found.")
-            if st.button("← Back"): st.session_state.page = "selector"; st.rerun()
+                else: st.error("Email not found.")
+            if st.button("Back"): st.session_state.page = "selector"; st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
-# 6. MAIN APP INTERFACE
+# 6. NAVIGATION
 with st.sidebar:
-    st.markdown("### 🌊 Flux Navigator")
+    st.markdown("<h2 style='text-align: center;'>🌊 Flux</h2>", unsafe_allow_html=True)
     st.write("---")
-    role = st.radio("Navigation", ["📖 Learning Center", "🛠 Administrator"], label_visibility="collapsed")
+    role = st.radio("Navigation", ["📖 Study Hub", "🛠 Admin Control"], label_visibility="collapsed")
+    st.write("---")
     if st.button("Sign Out", use_container_width=True):
         st.session_state.logged_in = False; st.session_state.page = "selector"; st.rerun()
 
 # --- ADMIN SECTION ---
-if "Administrator" in role:
-    if st.sidebar.text_input("Admin Password", type="password") == "flux":
-        st.header("Admin Control")
-        prog_name = st.text_input("Course Program Name (e.g. Computer Science)")
-        file = st.file_uploader("Bulk Upload Content", type=['xlsx', 'csv'])
-        if file and prog_name and st.button("Execute Bulk Upload"):
+if "Admin" in role:
+    if st.sidebar.text_input("Password", type="password") == "flux":
+        prog = st.text_input("Program Name")
+        file = st.file_uploader("Upload CSV/Excel Data")
+        if file and prog and st.button("Bulk Upload"):
             df = pd.read_excel(file) if "xlsx" in file.name else pd.read_csv(file)
             df = df.replace({np.nan: None})
             for _, row in df.iterrows():
                 try:
                     supabase.table("materials").insert({
-                        "course_program": prog_name,
-                        "course_name": str(row.get('Topic Covered', 'Unnamed Topic')),
+                        "course_program": prog,
+                        "course_name": str(row.get('Topic Covered', 'No Title')),
                         "video_url": str(row.get('Embeddable YouTube Video Link', '')),
-                        "notes_url": str(row.get('Link to Google docs Document', '')),
-                        "week": 1
+                        "notes_url": str(row.get('Link to Google docs Document', ''))
                     }).execute()
                 except: continue
-            st.success("Bulk Upload Complete!")
+            st.success("Successfully uploaded course content!")
 
-# --- LEARNING CENTER ---
+# --- STUDY HUB ---
 else:
-    st.title("My Study Hub")
+    st.markdown("<h1 style='text-align:center;'>Your Learning Journey</h1>", unsafe_allow_html=True)
     res = supabase.table("materials").select("*").execute()
     if res.data:
         df = pd.DataFrame(res.data)
         for prog in df['course_program'].unique():
-            st.markdown(f'<div class="course-header">📚 {prog}</div>', unsafe_allow_html=True)
-            st.markdown('<div class="content-card">', unsafe_allow_html=True)
+            st.markdown(f'<div class="course-title-bar">📂 {prog}</div>', unsafe_allow_html=True)
+            st.markdown('<div class="topic-container">', unsafe_allow_html=True)
             
-            items = df[df['course_program'] == prog]
-            for _, item in items.iterrows():
-                st.subheader(item.get('course_name'))
-                col1, col2 = st.columns([2, 1])
+            topics = df[df['course_program'] == prog]
+            for _, item in topics.iterrows():
+                st.markdown(f'<div class="topic-name">{item.get("course_name")}</div>', unsafe_allow_html=True)
                 
+                col1, col2 = st.columns([2, 1])
                 with col1:
-                    v_url = fix_youtube_link(item.get('video_url'))
-                    if v_url:
-                        st.video(v_url)
+                    embed_link = get_embed_url(item.get('video_url'))
+                    if embed_link:
+                        # Using st.video with the corrected embed link
+                        st.video(embed_link)
                     else:
-                        st.info("No video available for this topic.")
+                        st.info("No video link found for this topic.")
                 
                 with col2:
-                    st.write("**Resources**")
+                    st.write("### Resources")
                     if item.get('notes_url'):
-                        st.link_button("📂 View Documents", item['notes_url'], use_container_width=True)
-                    st.caption("Instructions: Study the video first, then open the notes for in-depth reading.")
+                        st.link_button("📚 Open Lecture Notes", item['notes_url'], use_container_width=True)
+                    st.write("---")
+                    st.caption("Please watch the video fully before proceeding to the notes.")
                 st.divider()
             st.markdown('</div>', unsafe_allow_html=True)
