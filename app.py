@@ -5,7 +5,7 @@ from supabase import create_client
 # 1. DATABASE CONNECTION
 PROJECT_ID = "uxtmgdenwfyuwhezcleh"
 SUPABASE_URL = f"https://{PROJECT_ID}.supabase.co"
-SUPABASE_KEY = "sb_publishable_1BIwMEH8FVDv7fFafz31uA_9FqAJr0-"
+SUPABASE_KEY = "sb_publishable_1BIwMEH8FVDv7fFaf_31uA_9FqAJr0-"
 
 try:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -14,7 +14,7 @@ except Exception:
     st.stop()
 
 # 2. SAFE FETCH SETTINGS
-bg_url = "https://images.unsplash.com/photo-1497366216548-37526070297c" # Default backup
+bg_url = "https://images.unsplash.com/photo-1497366216548-37526070297c" 
 try:
     bg_query = supabase.table("portal_settings").select("login_bg_url").eq("id", 1).execute()
     if bg_query.data:
@@ -25,7 +25,7 @@ except Exception:
 # 3. UI CONFIG & SELECTIVE STYLING
 st.set_page_config(page_title="Flux", layout="wide")
 
-# CSS for login background and Flux font
+# Enhanced CSS for visibility and branding
 if not st.session_state.get('logged_in', False):
     st.markdown(f"""
     <style>
@@ -34,11 +34,18 @@ if not st.session_state.get('logged_in', False):
             background-size: cover;
             background-attachment: fixed;
         }}
+        /* Login Box Styling with high contrast text */
         .login-box {{
-            background-color: rgba(255, 255, 255, 0.9);
+            background-color: rgba(255, 255, 255, 0.95);
             padding: 40px;
             border-radius: 15px;
-            box-shadow: 0px 4px 15px rgba(0,0,0,0.3);
+            box-shadow: 0px 10px 30px rgba(0,0,0,0.5);
+            color: black !important;
+        }}
+        /* Make sure hints/labels are black and visible */
+        .stTextInput label, .stHeader {{
+            color: black !important;
+            font-weight: bold !important;
         }}
     </style>
     """, unsafe_allow_html=True)
@@ -48,8 +55,8 @@ st.markdown("""
     .flux-font {
         font-family: "Comic Sans MS", "Comic Sans", cursive, sans-serif;
         font-weight: bold;
-        font-size: 0.9em; /* Smaller font */
-        color: black;    /* Black color */
+        font-size: 0.9em;
+        color: black;
     }
     .footer { position: fixed; left: 0; bottom: 0; width: 100%; text-align: center; padding: 10px; color: #666; font-size: 14px; background: white; border-top: 1px solid #eee; z-index: 999; }
     .video-container { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; background: #000; border-radius: 8px; margin-bottom: 10px; }
@@ -66,9 +73,9 @@ if not st.session_state.logged_in:
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
         st.markdown('<div class="login-box">', unsafe_allow_html=True)
-        st.markdown("<h2 style='text-align: center;'><span class='flux-font'>Flux</span></h2>", unsafe_allow_html=True)
-        st.text_input("Username", key="l_user")
-        st.text_input("Password", type="password", key="l_pass")
+        st.markdown("<h2 style='text-align: center; color: black;'><span class='flux-font'>Flux</span></h2>", unsafe_allow_html=True)
+        st.text_input("Username", key="l_user", placeholder="Enter your username")
+        st.text_input("Password", type="password", key="l_pass", placeholder="Enter your password")
         if st.button("Login", use_container_width=True) or st.button("Skip & Browse", use_container_width=True):
             st.session_state.logged_in = True
             st.rerun()
@@ -93,7 +100,7 @@ if role == "Admin Dashboard":
         new_bg = st.text_input("New Background Image URL", value=bg_url)
         if st.button("Update Background"):
             supabase.table("portal_settings").upsert({"id": 1, "login_bg_url": new_bg}).execute()
-            st.success("Background Updated! Log out to see changes.")
+            st.success("Background Updated!")
 
     with t1:
         with st.form("manual"):
@@ -116,14 +123,15 @@ if role == "Admin Dashboard":
         f = st.file_uploader("Upload CSV/Excel", type=["xlsx", "csv"])
         if f and target_course and st.button("Start Bulk Upload"):
             df = pd.read_excel(f) if "xlsx" in f.name else pd.read_csv(f)
+            # Sanitizing data for Supabase
             for _, row in df.iterrows():
                 supabase.table("materials").insert({
-                    "course_program": target_course,
+                    "course_program": str(target_course),
                     "course_name": str(row.get('Topic Covered', "No Title")),
-                    "week": int(row.get('Week', 1)),
+                    "week": int(pd.to_numeric(row.get('Week', 1), errors='coerce') or 1),
                     "video_url": str(row.get('Embeddable YouTube Video Link', "")),
                     "notes_url": str(row.get('link to Google docs Document', "")),
-                    "image_url": target_img
+                    "image_url": str(target_img)
                 }).execute()
             st.success("Bulk Upload Finished!")
 
