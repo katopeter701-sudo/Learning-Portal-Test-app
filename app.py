@@ -5,7 +5,7 @@ from supabase import create_client
 # 1. DATABASE CONNECTION
 PROJECT_ID = "uxtmgdenwfyuwhezcleh"
 SUPABASE_URL = f"https://{PROJECT_ID}.supabase.co"
-SUPABASE_KEY = "sb_publishable_1BIwMEH8FVDv7fFaf_31uA_9FqAJr0-"
+SUPABASE_KEY = "sb_publishable_1BIwMEH8FVDv7fFafz31uA_9FqAJr0-"
 
 try:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -22,45 +22,61 @@ try:
 except Exception:
     pass 
 
-# 3. UI CONFIG & SELECTIVE STYLING
+# 3. UI CONFIG & ADVANCED STYLING
 st.set_page_config(page_title="Flux", layout="wide")
 
-# Enhanced CSS for visibility and branding
-if not st.session_state.get('logged_in', False):
-    st.markdown(f"""
-    <style>
-        .stApp {{
-            background-image: url("{bg_url}");
-            background-size: cover;
-            background-attachment: fixed;
-        }}
-        /* Login Box Styling with high contrast text */
-        .login-box {{
-            background-color: rgba(255, 255, 255, 0.95);
-            padding: 40px;
-            border-radius: 15px;
-            box-shadow: 0px 10px 30px rgba(0,0,0,0.5);
-            color: black !important;
-        }}
-        /* Make sure hints/labels are black and visible */
-        .stTextInput label, .stHeader {{
-            color: black !important;
-            font-weight: bold !important;
-        }}
-    </style>
-    """, unsafe_allow_html=True)
-
-st.markdown("""
+st.markdown(f"""
 <style>
-    .flux-font {
+    /* Flux Branding - Small & Black */
+    .flux-font {{
         font-family: "Comic Sans MS", "Comic Sans", cursive, sans-serif;
         font-weight: bold;
         font-size: 0.9em;
         color: black;
-    }
-    .footer { position: fixed; left: 0; bottom: 0; width: 100%; text-align: center; padding: 10px; color: #666; font-size: 14px; background: white; border-top: 1px solid #eee; z-index: 999; }
-    .video-container { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; background: #000; border-radius: 8px; margin-bottom: 10px; }
-    .video-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+    }}
+
+    /* Sidebar/Nav Appearance */
+    [data-testid="stSidebar"] {{
+        background-color: #f8f9fa;
+        border-right: 1px solid #e0e0e0;
+    }}
+    
+    /* Navigation Radio Button Styling */
+    div[data-testid="stSidebarUserContent"] .stRadio > label {{
+        display: none;
+    }}
+    
+    .stRadio div[role="radiogroup"] {{
+        gap: 10px;
+        padding-top: 20px;
+    }}
+
+    /* Login Page Logic Background */
+    .stApp {{
+        background-attachment: fixed;
+    }}
+    
+    {'' if st.session_state.get('logged_in', False) else f'''
+    .stApp {{
+        background-image: url("{bg_url}");
+        background-size: cover;
+    }}
+    '''}
+
+    .login-box {{
+        background-color: rgba(255, 255, 255, 0.95);
+        padding: 40px;
+        border-radius: 15px;
+        box-shadow: 0px 10px 30px rgba(0,0,0,0.5);
+        color: black !important;
+    }}
+
+    .stTextInput label {{
+        color: black !important;
+        font-weight: bold !important;
+    }}
+
+    .footer {{ position: fixed; left: 0; bottom: 0; width: 100%; text-align: center; padding: 10px; color: #666; font-size: 14px; background: white; border-top: 1px solid #eee; z-index: 999; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -82,14 +98,27 @@ if not st.session_state.logged_in:
         st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
-# 5. SIDEBAR NAVIGATION
-role = st.sidebar.radio("Navigation", ["Student Portal", "Admin Dashboard"])
+# 5. IMPROVED SIDEBAR NAVIGATION
+with st.sidebar:
+    st.markdown(f"### <span class='flux-font'>Flux</span> Menu", unsafe_allow_html=True)
+    st.write("---")
+    # Using a cleaner radio selection
+    role = st.radio(
+        "Go to:",
+        ["📖 Student Portal", "🛠 Admin Dashboard"],
+        index=0,
+        key="nav_menu"
+    )
+    st.write("---")
+    if st.button("Log Out"):
+        st.session_state.logged_in = False
+        st.rerun()
 
 # --- ADMIN DASHBOARD ---
-if role == "Admin Dashboard":
-    admin_pw = st.sidebar.text_input("Admin Password", type="password")
+if "Admin Dashboard" in role:
+    admin_pw = st.sidebar.text_input("Confirm Admin Access", type="password")
     if admin_pw != "flux":
-        st.warning("Locked. Enter password 'flux' in sidebar.")
+        st.warning("Locked. Enter 'flux' to view management tools.")
         st.stop()
 
     st.header("Management Console")
@@ -123,7 +152,6 @@ if role == "Admin Dashboard":
         f = st.file_uploader("Upload CSV/Excel", type=["xlsx", "csv"])
         if f and target_course and st.button("Start Bulk Upload"):
             df = pd.read_excel(f) if "xlsx" in f.name else pd.read_csv(f)
-            # Sanitizing data for Supabase
             for _, row in df.iterrows():
                 supabase.table("materials").insert({
                     "course_program": str(target_course),
@@ -146,7 +174,7 @@ if role == "Admin Dashboard":
                     st.rerun()
 
 # --- STUDENT PORTAL ---
-elif role == "Student Portal":
+else:
     st.markdown("<h1><span class='flux-font'>Flux</span></h1>", unsafe_allow_html=True)
     search = st.text_input("🔍 Search Courses...").strip()
     
@@ -175,7 +203,7 @@ elif role == "Student Portal":
                     v_url = item.get('video_url', "")
                     if v_url and ("youtube.com" in v_url or "youtu.be" in v_url):
                         v_id = v_url.split("v=")[1].split("&")[0] if "v=" in v_url else v_url.split("/")[-1]
-                        st.markdown(f'<div class="video-container"><iframe src="https://www.youtube.com/embed/{v_id}" allowfullscreen></iframe></div>', unsafe_allow_html=True)
+                        st.markdown(f'<div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; background: #000; border-radius: 8px; margin-bottom: 10px;"><iframe src="https://www.youtube.com/embed/{v_id}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0;" allowfullscreen></iframe></div>', unsafe_allow_html=True)
                     if item.get('notes_url'):
                         st.link_button("Read Lecture Notes", item['notes_url'])
 
