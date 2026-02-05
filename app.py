@@ -10,19 +10,39 @@ SUPABASE_KEY = "sb_publishable_1BIwMEH8FVDv7fFafz31uA_9FqAJr0-"
 try:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 except Exception:
-    st.error("Database Connection Failed. Check your Supabase credentials.")
+    st.error("Database Connection Failed.")
     st.stop()
 
-# 2. UI CONFIG & SELECTIVE STYLING
+# 2. FETCH SETTINGS (Background Image)
+bg_query = supabase.table("portal_settings").select("login_bg_url").eq("id", 1).execute()
+bg_url = bg_query.data[0]['login_bg_url'] if bg_query.data else ""
+
+# 3. UI CONFIG & SELECTIVE STYLING
 st.set_page_config(page_title="Flux", layout="wide")
+
+# CSS for login background and Flux font
+if not st.session_state.get('logged_in', False):
+    st.markdown(f"""
+    <style>
+        .stApp {{
+            background-image: url("{bg_url}");
+            background-size: cover;
+        }}
+        .login-box {{
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 30px;
+            border-radius: 15px;
+        }}
+    </style>
+    """, unsafe_allow_html=True)
+
 st.markdown("""
 <style>
-    /* Only the word 'Flux' gets Comic Sans */
     .flux-font {
         font-family: "Comic Sans MS", "Comic Sans", cursive, sans-serif;
         font-weight: bold;
-        font-size: 1.5em;
-        color: #007BFF;
+        font-size: 1.0em; /* Smaller font */
+        color: black;    /* Black color */
     }
     .footer { position: fixed; left: 0; bottom: 0; width: 100%; text-align: center; padding: 10px; color: #666; font-size: 14px; background: white; border-top: 1px solid #eee; z-index: 999; }
     .video-container { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; background: #000; border-radius: 8px; margin-bottom: 10px; }
@@ -30,42 +50,50 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. LOGIN PAGE LOGIC
+# 4. LOGIN PAGE LOGIC
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
-    st.markdown("<h1 style='text-align: center; margin-top: 50px;'><span class='flux-font'>Flux</span></h1>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 1.5, 1])
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
-        with st.container(border=True):
-            st.subheader("Access Login")
-            st.text_input("Username", key="login_user")
-            st.text_input("Password", type="password", key="login_pass")
-            if st.button("Login", use_container_width=True) or st.button("Skip & Browse", use_container_width=True):
-                st.session_state.logged_in = True
-                st.rerun()
+        st.markdown('<div class="login-box">', unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align: center;'><span class='flux-font'>Flux</span></h1>", unsafe_allow_html=True)
+        st.text_input("Username", key="l_user")
+        st.text_input("Password", type="password", key="l_pass")
+        if st.button("Login", use_container_width=True) or st.button("Skip & Browse", use_container_width=True):
+            st.session_state.logged_in = True
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
-# 4. SIDEBAR NAVIGATION
+# 5. SIDEBAR NAVIGATION
 role = st.sidebar.radio("Navigation", ["Student Portal", "Admin Dashboard", "President Board"])
 
-# --- ADMIN DASHBOARD (Password Protected: flux) ---
+# --- ADMIN DASHBOARD ---
 if role == "Admin Dashboard":
     admin_pw = st.sidebar.text_input("Admin Password", type="password")
     if admin_pw != "flux":
-        st.warning("Dashboard Locked. Enter 'flux' in the sidebar to proceed.")
+        st.warning("Locked. Enter password 'flux' in sidebar.")
         st.stop()
 
     st.header("Management Console")
-    t1, t2, t3 = st.tabs(["Add Entry", "Bulk Upload", "Delete Content"])
+    t1, t2, t3, t4 = st.tabs(["Add Entry", "Bulk Upload", "Delete Content", "App Settings"])
     
+    with t4:
+        st.subheader("Login Page Customization")
+        new_bg = st.text_input("New Background Image URL", value=bg_url)
+        if st.button("Update Background"):
+            supabase.table("portal_settings").update({"login_bg_url": new_bg}).eq("id", 1).execute()
+            st.success("Background Updated! Log out to see changes.")
+
     with t1:
-        with st.form("manual_entry"):
+        with st.form("manual"):
             p = st.text_input("Course Name")
             t = st.text_input("Module Topic")
             w = st.number_input("Week Number", 1, 15)
-            img = st.text_input("Image URL (Direct link for Tile)")
+            img = st.text_input("Image URL (for Tile)")
             v = st.text_input("YouTube Link")
             n = st.text_input("Notes Link")
             if st.form_submit_button("Save to Flux"):
@@ -73,7 +101,7 @@ if role == "Admin Dashboard":
                     "course_program": p, "course_name": t, "week": w, 
                     "video_url": v, "notes_url": n, "image_url": img
                 }).execute()
-                st.success("Successfully saved to database!")
+                st.success("Successfully saved!")
 
     with t2:
         target_course = st.text_input("Target Course Name")
@@ -105,11 +133,8 @@ if role == "Admin Dashboard":
 # --- STUDENT PORTAL ---
 elif role == "Student Portal":
     st.markdown("<h1><span class='flux-font'>Flux</span></h1>", unsafe_allow_html=True)
+    search = st.text_input("🔍 Search Courses...").strip()
     
-    # Keyword Search Logic
-    search = st.text_input("🔍 Search Courses or Topics...").strip()
-    
-    # DISPLAY COURSE TILES
     st.write("### Courses")
     course_list = supabase.table("materials").select("course_program, image_url").execute()
     if course_list.data:
@@ -124,28 +149,19 @@ elif role == "Student Portal":
             with cols[i % 4]:
                 if img_url:
                     st.image(img_url, use_container_width=True)
-                else:
-                    st.info("No Preview")
                 st.markdown(f"<p style='text-align: center;'><b>{name}</b></p>", unsafe_allow_html=True)
 
     if search:
         st.write("---")
-        # Search by both course name and module title
-        res = supabase.table("materials").select("*")\
-            .or_(f"course_program.ilike.%{search}%,course_name.ilike.%{search}%")\
-            .order("week").execute()
-            
+        res = supabase.table("materials").select("*").or_(f"course_program.ilike.%{search}%,course_name.ilike.%{search}%").order("week").execute()
         if res.data:
             for item in res.data:
                 with st.expander(f"Week {item.get('week')} - {item.get('course_name')}"):
-                    st.caption(f"Course: {item.get('course_program')}")
                     v_url = item.get('video_url', "")
                     if v_url and ("youtube.com" in v_url or "youtu.be" in v_url):
                         v_id = v_url.split("v=")[1].split("&")[0] if "v=" in v_url else v_url.split("/")[-1]
                         st.markdown(f'<div class="video-container"><iframe src="https://www.youtube.com/embed/{v_id}" allowfullscreen></iframe></div>', unsafe_allow_html=True)
                     if item.get('notes_url'):
                         st.link_button("Read Lecture Notes", item['notes_url'])
-        else:
-            st.info("No matching content found.")
 
 st.markdown('<div class="footer">Built by KMT Dynamics</div>', unsafe_allow_html=True)
