@@ -13,7 +13,7 @@ except Exception:
     st.error("Database Connection Failed.")
     st.stop()
 
-# 2. SAFE FETCH SETTINGS
+# 2. SAFE FETCH SETTINGS (Prevents crash if table is empty)
 bg_url = "https://images.unsplash.com/photo-1497366216548-37526070297c" 
 try:
     bg_query = supabase.table("portal_settings").select("login_bg_url").eq("id", 1).execute()
@@ -25,58 +25,49 @@ except Exception:
 # 3. UI CONFIG & ADVANCED STYLING
 st.set_page_config(page_title="Flux", layout="wide")
 
-st.markdown(f"""
+# CSS for login background, high-contrast visibility, and branding
+if not st.session_state.get('logged_in', False):
+    st.markdown(f"""
+    <style>
+        .stApp {{
+            background-image: url("{bg_url}");
+            background-size: cover;
+            background-attachment: fixed;
+        }}
+        .login-box {{
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0px 10px 30px rgba(0,0,0,0.5);
+            color: black !important;
+        }}
+        /* VISIBILITY FIX: Ensuring all hints and labels are black and bold */
+        .stTextInput label, .stHeader, .login-box h2 {{
+            color: black !important;
+            font-weight: bold !important;
+        }}
+        input::placeholder {{
+            color: #555 !important;
+        }}
+    </style>
+    """, unsafe_allow_html=True)
+
+st.markdown("""
 <style>
-    /* Flux Branding - Small & Black */
-    .flux-font {{
+    /* Small Black Flux Branding */
+    .flux-font {
         font-family: "Comic Sans MS", "Comic Sans", cursive, sans-serif;
         font-weight: bold;
         font-size: 0.9em;
         color: black;
-    }}
-
-    /* Sidebar/Nav Appearance */
-    [data-testid="stSidebar"] {{
+    }
+    .footer { position: fixed; left: 0; bottom: 0; width: 100%; text-align: center; padding: 10px; color: #666; font-size: 14px; background: white; border-top: 1px solid #eee; z-index: 999; }
+    
+    /* Navigation/Sidebar Appearance */
+    [data-testid="stSidebar"] {
         background-color: #f8f9fa;
         border-right: 1px solid #e0e0e0;
-    }}
-    
-    /* Navigation Radio Button Styling */
-    div[data-testid="stSidebarUserContent"] .stRadio > label {{
-        display: none;
-    }}
-    
-    .stRadio div[role="radiogroup"] {{
-        gap: 10px;
-        padding-top: 20px;
-    }}
-
-    /* Login Page Logic Background */
-    .stApp {{
-        background-attachment: fixed;
-    }}
-    
-    {'' if st.session_state.get('logged_in', False) else f'''
-    .stApp {{
-        background-image: url("{bg_url}");
-        background-size: cover;
-    }}
-    '''}
-
-    .login-box {{
-        background-color: rgba(255, 255, 255, 0.95);
-        padding: 40px;
-        border-radius: 15px;
-        box-shadow: 0px 10px 30px rgba(0,0,0,0.5);
-        color: black !important;
-    }}
-
-    .stTextInput label {{
-        color: black !important;
-        font-weight: bold !important;
-    }}
-
-    .footer {{ position: fixed; left: 0; bottom: 0; width: 100%; text-align: center; padding: 10px; color: #666; font-size: 14px; background: white; border-top: 1px solid #eee; z-index: 999; }}
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -89,9 +80,11 @@ if not st.session_state.logged_in:
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
         st.markdown('<div class="login-box">', unsafe_allow_html=True)
-        st.markdown("<h2 style='text-align: center; color: black;'><span class='flux-font'>Flux</span></h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center;'><span class='flux-font'>Flux</span></h2>", unsafe_allow_html=True)
         st.text_input("Username", key="l_user", placeholder="Enter your username")
         st.text_input("Password", type="password", key="l_pass", placeholder="Enter your password")
+        
+        # Syntax Error Fixed (Button text on one line)
         if st.button("Login", use_container_width=True) or st.button("Skip & Browse", use_container_width=True):
             st.session_state.logged_in = True
             st.rerun()
@@ -102,9 +95,8 @@ if not st.session_state.logged_in:
 with st.sidebar:
     st.markdown(f"### <span class='flux-font'>Flux</span> Menu", unsafe_allow_html=True)
     st.write("---")
-    # Using a cleaner radio selection
     role = st.radio(
-        "Go to:",
+        "Navigation:",
         ["📖 Student Portal", "🛠 Admin Dashboard"],
         index=0,
         key="nav_menu"
@@ -118,7 +110,7 @@ with st.sidebar:
 if "Admin Dashboard" in role:
     admin_pw = st.sidebar.text_input("Confirm Admin Access", type="password")
     if admin_pw != "flux":
-        st.warning("Locked. Enter 'flux' to view management tools.")
+        st.warning("Locked. Enter 'flux' in the sidebar to proceed.")
         st.stop()
 
     st.header("Management Console")
@@ -152,6 +144,7 @@ if "Admin Dashboard" in role:
         f = st.file_uploader("Upload CSV/Excel", type=["xlsx", "csv"])
         if f and target_course and st.button("Start Bulk Upload"):
             df = pd.read_excel(f) if "xlsx" in f.name else pd.read_csv(f)
+            # Sanitized bulk upload to prevent APIErrors
             for _, row in df.iterrows():
                 supabase.table("materials").insert({
                     "course_program": str(target_course),
