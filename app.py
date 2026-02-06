@@ -14,16 +14,17 @@ except Exception:
     st.error("Database Connection Failed.")
     st.stop()
 
-# 2. SESSION STATE
+# 2. SESSION STATE INITIALIZATION
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'user_type' not in st.session_state: st.session_state.user_type = None
 if 'page' not in st.session_state: st.session_state.page = "selector"
 if 'current_course' not in st.session_state: st.session_state.current_course = None
+if 'role' not in st.session_state: st.session_state.role = "Learning Center"
 
-# Hardcoded foundational course tiles
+# FIXED IMAGE TILES: Direct Download Format
 COURSE_TILES = {
-    "Computer Science": "https://drive.google.com/uc?export=view&id=1-diy5YsO0TdGj73Y3SoC6FL8UWEJxy51",
-    "ACCA": "https://drive.google.com/uc?export=view&id=1-diy5YsO0TdGj73Y3SoC6FL8UWEJxy51"
+    "Computer Science": "https://drive.google.com/uc?export=download&id=1-diy5YsO0TdGj73Y3SoC6FL8UWEJxy51",
+    "ACCA": "https://drive.google.com/uc?export=download&id=1-diy5YsO0TdGj73Y3SoC6FL8UWEJxy51"
 }
 
 # 3. BACKGROUND FETCH
@@ -40,8 +41,13 @@ st.markdown(f"""
 <style>
     .stApp {{ background-image: url("{bg_url}"); background-size: cover; background-attachment: fixed; }}
     
-    h1, h2, h3, p, span, label, .stMarkdown {{ color: white !important; }}
+    h1, h2, h3, p, span, label, .stMarkdown, .stSubheader {{ color: white !important; }}
 
+    /* Sidebar Navigation Styling */
+    [data-testid="stSidebar"] {{ background-color: rgba(0, 0, 0, 0.7) !important; }}
+    [data-testid="stSidebar"] .stText, [data-testid="stSidebar"] p, [data-testid="stSidebar"] span {{ color: white !important; }}
+    
+    /* Login/Signup Box */
     .login-box {{
         background-color: white; padding: 40px; border-radius: 15px;
         box-shadow: 0px 10px 40px rgba(0,0,0,0.4); max-width: 450px; margin: auto;
@@ -49,10 +55,11 @@ st.markdown(f"""
     }}
     .login-box h1, .login-box h2, .login-box h3, .login-box p, .login-box label {{ color: black !important; }}
     
-    /* Login/Signup Hints (Placeholders) to Grey/Black */
+    /* Small Black Hints (Placeholders) */
     input::placeholder {{
-        color: #333333 !important;
-        opacity: 1;
+        color: black !important;
+        font-size: 11px !important;
+        opacity: 1 !important;
     }}
 
     .flux-box {{ 
@@ -73,35 +80,49 @@ if not st.session_state.logged_in:
         st.markdown('<div class="flux-box">flux</div>', unsafe_allow_html=True)
         
         if st.session_state.page == "selector":
-            if st.button("Sign In", use_container_width=True): st.session_state.page = "login"; st.rerun()
-            if st.button("Register", use_container_width=True): st.session_state.page = "signup"; st.rerun()
-            if st.button("Public Access", use_container_width=True): 
+            if st.button("Sign In", key="btn_signin", use_container_width=True): st.session_state.page = "login"; st.rerun()
+            if st.button("Register", key="btn_reg", use_container_width=True): st.session_state.page = "signup"; st.rerun()
+            if st.button("Public Access", key="btn_pub", use_container_width=True): 
                 st.session_state.user_type = "public"; st.session_state.logged_in = True; st.rerun()
 
         elif st.session_state.page == "signup":
-            name = st.text_input("Full Name", placeholder="Enter your full name")
-            email = st.text_input("Email", placeholder="Enter your email address")
+            name = st.text_input("Full Name", placeholder="enter your full name")
+            email = st.text_input("Email", placeholder="enter your email address")
             if st.button("Create Account", use_container_width=True):
                 supabase.table("users").insert({"full_name": name, "email": email}).execute()
                 st.success("Success! Please Login.")
                 st.session_state.page = "login"; st.rerun()
-            if st.button("Back"): st.session_state.page = "selector"; st.rerun()
+            if st.button("Back", key="back_reg"): st.session_state.page = "selector"; st.rerun()
 
         elif st.session_state.page == "login":
-            u_email = st.text_input("Email", placeholder="Enter your registered email")
+            u_email = st.text_input("Email", placeholder="enter your registered email")
             if st.button("Login", use_container_width=True):
                 user = supabase.table("users").select("*").eq("email", u_email).execute()
                 if user.data:
                     st.session_state.user_type = "kiu" if user.data[0].get('is_kiu_student') else "public"
                     st.session_state.logged_in = True; st.rerun()
                 else: st.error("User not found.")
-            if st.button("Back"): st.session_state.page = "selector"; st.rerun()
+            if st.button("Back", key="back_log"): st.session_state.page = "selector"; st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
-# 6. MAIN NAVIGATION
-role = st.sidebar.radio("Navigation", ["Learning Center", "Administrator"])
+# 6. SIDEBAR NAVIGATION
+with st.sidebar:
+    st.markdown("### Navigation")
+    if st.button("Learning Center", key="nav_lc", use_container_width=True):
+        st.session_state.role = "Learning Center"
+        st.rerun()
+    if st.button("Administrator", key="nav_admin", use_container_width=True):
+        st.session_state.role = "Administrator"
+        st.rerun()
+    st.write("---")
+    if st.button("Logout", key="nav_logout", use_container_width=True):
+        st.session_state.logged_in = False
+        st.rerun()
 
+role = st.session_state.role
+
+# --- ADMIN CONSOLE ---
 if role == "Administrator":
     if st.sidebar.text_input("Password", type="password") != "flux": st.stop()
     st.header("Admin Console")
@@ -120,8 +141,8 @@ if role == "Administrator":
             }).execute()
         st.success("Uploaded!")
 
+# --- STUDENT PORTAL ---
 else:
-    # Handle Course Detailed View
     if st.session_state.current_course:
         if st.button("← Back to Learning Path"):
             st.session_state.current_course = None
@@ -130,46 +151,55 @@ else:
         course_name = st.session_state.current_course
         st.title(f"Modules: {course_name}")
         
-        res = supabase.table("materials").select("*").eq("course_program", course_name).execute()
-        if res.data:
-            for item in res.data:
-                with st.expander(f"Week {item['week']}: {item['course_name']}"):
-                    st.write("### Module Content")
-                    if item.get('video_url'):
-                        st.write("**Playlist Link / Video:**")
-                        st.video(item['video_url'])
-                    if item.get('notes_url'):
-                        st.write("**Textbooks & Notes:**")
-                        st.link_button("Open Textbook/Notes", item['notes_url'])
-        else:
-            st.info("No detailed modules found for this course yet.")
+        # FIX: Try/Except block to handle Supabase API Errors gracefully
+        try:
+            res = supabase.table("materials").select("*").eq("course_program", course_name).execute()
+            if res.data:
+                for item in res.data:
+                    with st.expander(f"Week {item['week']}: {item['course_name']}"):
+                        st.write("### Module Content")
+                        if item.get('video_url'):
+                            st.write("**Playlist Link / Video:**")
+                            st.video(item['video_url'])
+                        if item.get('notes_url'):
+                            st.write("**Textbooks & Notes:**")
+                            st.link_button("Open Textbook/Notes", item['notes_url'])
+            else:
+                st.info("No detailed modules found for this course yet.")
+        except Exception as e:
+            st.error("Database connection error. Please ensure the 'materials' table exists and RLS policies are set.")
 
     else:
         st.title("My Learning Path")
 
         # 1. SEARCH BAR
-        search = st.text_input("Search Database (e.g., ACCA, Computer Science)")
-        if search and st.button("Explore Course"):
+        search = st.text_input("Search Database", placeholder="e.g. ACCA or Computer Science")
+        if search and st.button("Take on this Module"):
             st.session_state.current_course = search
             st.rerun()
         
         st.write("---")
 
-        # 2. FOUNDATIONAL COURSES
+        # 2. FOUNDATION IMAGES
         st.subheader("Foundation Courses")
-        f1, f2 = st.columns(2)
-        with f1:
+        i_col1, i_col2 = st.columns(2)
+        with i_col1:
             st.image(COURSE_TILES["Computer Science"], caption="Computer Science", use_container_width=True)
-            st.video("https://youtu.be/TjPFZaMe2yw?si=vFV8DKTaoVVgGQ8j") 
-            if st.button("View Computer Science Modules", key="cs_btn"):
+            if st.button("Select Computer Science", key="cs_btn_nav"):
                 st.session_state.current_course = "Computer Science"
                 st.rerun()
-        with f2:
+        with i_col2:
             st.image(COURSE_TILES["ACCA"], caption="ACCA", use_container_width=True)
-            st.video("https://youtu.be/U-7THjkQdbg?si=QkDfHeJUws8h-79J")
-            if st.button("View ACCA Modules", key="acca_btn"):
+            if st.button("Select ACCA", key="acca_btn_nav"):
                 st.session_state.current_course = "ACCA"
                 st.rerun()
 
         st.write("---")
-        st.info("Select a course above or search to view module titles, playlists, and textbooks.")
+
+        # 3. YOUTUBE VIDEOS (Bottom)
+        st.subheader("Introductory Overviews")
+        v_col1, v_col2 = st.columns(2)
+        with v_col1:
+            st.video("https://youtu.be/TjPFZaMe2yw?si=vFV8DKTaoVVgGQ8j") 
+        with v_col2:
+            st.video("https://youtu.be/U-7THjkQdbg?si=QkDfHeJUws8h-79J")
