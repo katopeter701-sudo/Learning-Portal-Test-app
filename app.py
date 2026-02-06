@@ -14,142 +14,111 @@ except Exception:
     st.error("Database Connection Failed.")
     st.stop()
 
-# 2. SESSION STATE INITIALIZATION
+# 2. SESSION STATE
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'page' not in st.session_state: st.session_state.page = "selector"
 if 'current_course' not in st.session_state: st.session_state.current_course = None
 if 'role' not in st.session_state: st.session_state.role = "Learning Center"
 
-# 3. GOOGLE DRIVE IMAGE FIX
-# This format (uc?id=) is the most reliable for direct rendering in Streamlit
-DRIVE_ID = "1-diy5YsO0TdGj73Y3SoC6FL8UWEJxy51"
-IMAGE_URL = f"https://drive.google.com/uc?id={DRIVE_ID}"
-
+# 3. HARDCODED GITHUB RAW LINKS
+# Replace these URLs with your actual GitHub Raw links once you upload them
 COURSE_TILES = {
-    "Computer Science": IMAGE_URL,
-    "ACCA": IMAGE_URL
+    "Computer Science": "https://raw.githubusercontent.com/streamlit/st-vizz-images/main/cat.jpg", 
+    "ACCA": "https://raw.githubusercontent.com/streamlit/st-vizz-images/main/dog.jpg"
 }
 
-# 4. BACKGROUND FETCH
+# 4. BACKGROUND IMAGE
 bg_url = "https://images.unsplash.com/photo-1497366216548-37526070297c"
 try:
     bg_query = supabase.table("portal_settings").select("login_bg_url").eq("id", 1).execute()
     if bg_query.data: bg_url = bg_query.data[0]['login_bg_url']
 except: pass
 
-# 5. MODERN UI STYLING
+# 5. UI STYLING
 st.set_page_config(page_title="Flux | Portal", layout="wide")
 
 st.markdown(f"""
 <style>
     .stApp {{ background-image: url("{bg_url}"); background-size: cover; background-attachment: fixed; }}
-    
-    /* Centering the flux branding and removing the top empty bar */
-    .login-container {{
-        display: flex; flex-direction: column; align-items: center; justify-content: center;
-        margin-top: 10vh;
+    header {{visibility: hidden;}}
+    .main .block-container {{padding-top: 2rem;}}
+
+    .brand-container {{ display: flex; justify-content: center; margin-bottom: 2rem; }}
+    .flux-logo {{ 
+        background-color: #000; color: #fff !important; padding: 15px 40px; border-radius: 12px;
+        font-family: "Comic Sans MS", cursive; font-weight: bold; font-size: 3em; text-align: center; width: fit-content;
     }}
 
-    .flux-box {{ 
-        background-color: #000; color: #fff !important; padding: 15px 40px; border-radius: 8px;
-        font-family: "Comic Sans MS", cursive; font-weight: bold; font-size: 3em;
-        margin-bottom: 40px; text-align: center;
-    }}
-
-    /* Buttons: Fixed visibility and styling */
-    .stButton button {{
-        background-color: white !important;
-        color: black !important; /* Text always black and visible */
-        border-radius: 10px !important;
+    /* Global Button Styling - White Pill with Black Text */
+    div.stButton > button {{
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        border-radius: 25px !important;
         border: none !important;
-        font-weight: bold !important;
-        height: 3em !important;
         width: 100% !important;
+        height: 3.5em !important;
+        font-weight: 600 !important;
+        box-shadow: 0px 4px 10px rgba(0,0,0,0.2);
     }}
-
-    /* Sign Up Page Specifics */
-    .signup-button button {{
-        background-color: #28a745 !important; /* Green Button */
-        color: black !important;
-    }}
-
-    /* Placeholder/Hint styling */
-    input::placeholder {{
-        color: black !important;
-        font-size: 13px !important;
-        opacity: 0.7 !important;
-    }}
-
-    /* Sidebar and General Text */
+    
+    /* Sidebar Styling */
     [data-testid="stSidebar"] {{ background-color: rgba(0, 0, 0, 0.8) !important; }}
+    .sidebar-nav-header {{ color: #333333 !important; font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem; }}
+    [data-testid="stSidebar"] button div p {{ color: black !important; }}
+
+    /* Signup Button override to Green */
+    .signup-area button {{ background-color: #28a745 !important; color: #000000 !important; }}
+
+    /* Placeholders/Hints and General Text */
+    input::placeholder {{ color: black !important; font-size: 13px; }}
     h1, h2, h3, p, span, label {{ color: white !important; }}
-    [data-testid="stSidebar"] button p {{ color: black !important; }}
 </style>
 """, unsafe_allow_html=True)
 
-# 6. AUTHENTICATION FLOW
+# 6. AUTHENTICATION SCREENS
 if not st.session_state.logged_in:
-    # Use columns to keep the central alignment from your image
     _, col_mid, _ = st.columns([1, 2, 1])
-    
     with col_mid:
-        st.markdown('<div class="login-container">', unsafe_allow_html=True)
-        st.markdown('<div class="flux-box">flux</div>', unsafe_allow_html=True)
+        st.markdown('<div class="brand-container"><div class="flux-logo">flux</div></div>', unsafe_allow_html=True)
         
         if st.session_state.page == "selector":
-            st.button("Sign In", key="btn_signin", on_click=lambda: setattr(st.session_state, 'page', 'login'))
-            st.button("Register", key="btn_reg", on_click=lambda: setattr(st.session_state, 'page', 'signup'))
-            st.button("Public Access", key="btn_pub", on_click=lambda: st.session_state.update({"logged_in": True}))
+            if st.button("Sign In"): st.session_state.page = "login"; st.rerun()
+            if st.button("Register"): st.session_state.page = "signup"; st.rerun()
+            if st.button("Public Access"): st.session_state.logged_in = True; st.rerun()
 
         elif st.session_state.page == "signup":
-            name = st.text_input("Full Name", placeholder="enter your full name")
-            email = st.text_input("Email", placeholder="enter your email address")
-            student_id = st.text_input("Registration ID", placeholder="KIU- Student ID")
-            
-            # Green Button Container
-            st.markdown('<div class="signup-button">', unsafe_allow_html=True)
-            if st.button("Create Account", use_container_width=True):
-                supabase.table("users").insert({"full_name": name, "email": email, "registration_number": student_id}).execute()
-                st.success("Success! Please Login.")
-                st.session_state.page = "login"
-                st.rerun()
+            st.text_input("Full Name", placeholder="enter your full name")
+            st.text_input("Email", placeholder="enter your email address")
+            st.text_input("Registration ID", placeholder="KIU- Student ID")
+            st.markdown('<div class="signup-area">', unsafe_allow_html=True)
+            if st.button("Create Account"):
+                st.success("Account Created! Please Login.")
+                st.session_state.page = "login"; st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
-            
             if st.button("Back"): st.session_state.page = "selector"; st.rerun()
 
         elif st.session_state.page == "login":
-            u_email = st.text_input("Email", placeholder="enter your registered email")
-            if st.button("Login", use_container_width=True):
-                user = supabase.table("users").select("*").eq("email", u_email).execute()
-                if user.data:
-                    st.session_state.logged_in = True; st.rerun()
-                else: st.error("User not found.")
+            st.text_input("Email", placeholder="enter your registered email")
+            if st.button("Login"): st.session_state.logged_in = True; st.rerun()
             if st.button("Back"): st.session_state.page = "selector"; st.rerun()
-        
-        st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
-# 7. MAIN APP LOGIC (Sidebar and Content)
+# 7. MAIN APP CONTENT
 with st.sidebar:
-    st.markdown("### Navigation")
-    if st.button("Learning Center", use_container_width=True): st.session_state.role = "Learning Center"; st.rerun()
-    if st.button("Administrator", use_container_width=True): st.session_state.role = "Administrator"; st.rerun()
+    st.markdown('<div class="sidebar-nav-header">Navigation</div>', unsafe_allow_html=True)
+    if st.button("Learning Center"): st.session_state.role = "Learning Center"; st.rerun()
+    if st.button("Administrator"): st.session_state.role = "Administrator"; st.rerun()
     st.write("---")
-    if st.button("Logout", use_container_width=True): st.session_state.clear(); st.rerun()
+    if st.button("Logout"): st.session_state.clear(); st.rerun()
 
 if st.session_state.role == "Administrator":
     st.title("Admin Console")
-    # Admin tools here...
 else:
-    # Student Portal Content
     if st.session_state.current_course:
-        if st.button("← Back"): st.session_state.current_course = None; st.rerun()
+        if st.button("← Back to Path"): st.session_state.current_course = None; st.rerun()
         st.title(f"Modules: {st.session_state.current_course}")
-        # Fetching database content...
     else:
         st.title("My Learning Path")
-        
-        # Course Selection Tiles
         c1, c2 = st.columns(2)
         with c1:
             st.image(COURSE_TILES["Computer Science"], caption="Computer Science", use_container_width=True)
