@@ -18,6 +18,7 @@ except Exception:
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'user_type' not in st.session_state: st.session_state.user_type = None
 if 'page' not in st.session_state: st.session_state.page = "selector"
+if 'current_course' not in st.session_state: st.session_state.current_course = None
 
 # Hardcoded foundational course tiles
 COURSE_TILES = {
@@ -37,31 +38,29 @@ st.set_page_config(page_title="Flux | Portal", layout="wide")
 
 st.markdown(f"""
 <style>
-    /* Global Background */
     .stApp {{ background-image: url("{bg_url}"); background-size: cover; background-attachment: fixed; }}
     
-    /* Force text to white for readability against dark backgrounds */
-    h1, h2, h3, p, span, label, .stMarkdown {{
-        color: white !important;
-    }}
+    h1, h2, h3, p, span, label, .stMarkdown {{ color: white !important; }}
 
-    /* Login Box (Keeps white background for contrast) */
     .login-box {{
         background-color: white; padding: 40px; border-radius: 15px;
         box-shadow: 0px 10px 40px rgba(0,0,0,0.4); max-width: 450px; margin: auto;
         text-align: center;
     }}
-    .login-box h1, .login-box h2, .login-box h3, .login-box p, .login-box label {{
-        color: black !important;
-    }}
+    .login-box h1, .login-box h2, .login-box h3, .login-box p, .login-box label {{ color: black !important; }}
     
+    /* Login/Signup Hints (Placeholders) to Grey/Black */
+    input::placeholder {{
+        color: #333333 !important;
+        opacity: 1;
+    }}
+
     .flux-box {{ 
         background-color: #000; color: #fff !important; padding: 15px 30px; border-radius: 8px;
         font-family: "Comic Sans MS", cursive; font-weight: bold; font-size: 2.5em;
         display: inline-block; margin-bottom: 30px;
     }}
     
-    /* Fixes Search Bar Label color */
     .stTextInput label {{ color: white !important; }}
 </style>
 """, unsafe_allow_html=True)
@@ -80,8 +79,8 @@ if not st.session_state.logged_in:
                 st.session_state.user_type = "public"; st.session_state.logged_in = True; st.rerun()
 
         elif st.session_state.page == "signup":
-            name = st.text_input("Full Name")
-            email = st.text_input("Email")
+            name = st.text_input("Full Name", placeholder="Enter your full name")
+            email = st.text_input("Email", placeholder="Enter your email address")
             if st.button("Create Account", use_container_width=True):
                 supabase.table("users").insert({"full_name": name, "email": email}).execute()
                 st.success("Success! Please Login.")
@@ -89,7 +88,7 @@ if not st.session_state.logged_in:
             if st.button("Back"): st.session_state.page = "selector"; st.rerun()
 
         elif st.session_state.page == "login":
-            u_email = st.text_input("Email")
+            u_email = st.text_input("Email", placeholder="Enter your registered email")
             if st.button("Login", use_container_width=True):
                 user = supabase.table("users").select("*").eq("email", u_email).execute()
                 if user.data:
@@ -122,42 +121,55 @@ if role == "Administrator":
         st.success("Uploaded!")
 
 else:
-    st.title("My Learning Path")
-
-    # 1. SEARCH BAR (At the top)
-    search = st.text_input("Search Database (e.g., ACCA, Computer Science)")
-    
-    st.write("---")
-
-    # 2. FOUNDATIONAL COURSES (Computer Science & ACCA)
-    st.subheader("Foundation Courses")
-    f1, f2 = st.columns(2)
-    with f1:
-        st.image(COURSE_TILES["Computer Science"], caption="Computer Science", use_container_width=True)
-        # You can add a default playlist video here if desired
-        st.video("https://www.youtube.com/watch?v=dQw4w9WgXcQ") 
-    with f2:
-        st.image(COURSE_TILES["ACCA"], caption="ACCA", use_container_width=True)
-        # You can add a default playlist video here if desired
-        st.video("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-
-    st.write("---")
-
-    # 3. DYNAMIC DATABASE CONTENT
-    if search:
-        res = supabase.table("materials").select("*").ilike("course_program", f"%{search}%").execute()
+    # Handle Course Detailed View
+    if st.session_state.current_course:
+        if st.button("← Back to Learning Path"):
+            st.session_state.current_course = None
+            st.rerun()
+        
+        course_name = st.session_state.current_course
+        st.title(f"Modules: {course_name}")
+        
+        res = supabase.table("materials").select("*").eq("course_program", course_name).execute()
         if res.data:
-            df = pd.DataFrame(res.data)
-            for program in df['course_program'].unique():
-                st.subheader(f"Program: {program}")
-                prog_df = df[df['course_program'] == program]
-                cols = st.columns(3)
-                for idx, item in enumerate(prog_df.sort_values('week').to_dict('records')):
-                    with cols[idx % 3]:
-                        with st.expander(f"Week {item['week']}: {item['course_name']}"):
-                            if item.get('video_url'): st.video(item['video_url'])
-                            if item.get('notes_url'): st.link_button("View Notes", item['notes_url'])
+            for item in res.data:
+                with st.expander(f"Week {item['week']}: {item['course_name']}"):
+                    st.write("### Module Content")
+                    if item.get('video_url'):
+                        st.write("**Playlist Link / Video:**")
+                        st.video(item['video_url'])
+                    if item.get('notes_url'):
+                        st.write("**Textbooks & Notes:**")
+                        st.link_button("Open Textbook/Notes", item['notes_url'])
         else:
-            st.info("No matching results found in the database.")
+            st.info("No detailed modules found for this course yet.")
+
     else:
-        st.info("Enter a course name above to view modules.")
+        st.title("My Learning Path")
+
+        # 1. SEARCH BAR
+        search = st.text_input("Search Database (e.g., ACCA, Computer Science)")
+        if search and st.button("Explore Course"):
+            st.session_state.current_course = search
+            st.rerun()
+        
+        st.write("---")
+
+        # 2. FOUNDATIONAL COURSES
+        st.subheader("Foundation Courses")
+        f1, f2 = st.columns(2)
+        with f1:
+            st.image(COURSE_TILES["Computer Science"], caption="Computer Science", use_container_width=True)
+            st.video("https://youtu.be/TjPFZaMe2yw?si=vFV8DKTaoVVgGQ8j") 
+            if st.button("View Computer Science Modules", key="cs_btn"):
+                st.session_state.current_course = "Computer Science"
+                st.rerun()
+        with f2:
+            st.image(COURSE_TILES["ACCA"], caption="ACCA", use_container_width=True)
+            st.video("https://youtu.be/U-7THjkQdbg?si=QkDfHeJUws8h-79J")
+            if st.button("View ACCA Modules", key="acca_btn"):
+                st.session_state.current_course = "ACCA"
+                st.rerun()
+
+        st.write("---")
+        st.info("Select a course above or search to view module titles, playlists, and textbooks.")
