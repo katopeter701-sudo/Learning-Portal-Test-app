@@ -19,10 +19,10 @@ if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'user_type' not in st.session_state: st.session_state.user_type = None
 if 'page' not in st.session_state: st.session_state.page = "selector"
 
-# Hardcoded Images for specific courses
+# Hardcoded foundational course tiles
 COURSE_TILES = {
-    "ACCA": "https://drive.google.com/file/d/1-diy5YsO0TdGj73Y3SoC6FL8UWEJxy51/view?usp=sharing",
-    "Computer Science": "https://drive.google.com/file/d/1-diy5YsO0TdGj73Y3SoC6FL8UWEJxy51/view?usp=sharing"
+    "Computer Science": "https://drive.google.com/uc?export=view&id=1-diy5YsO0TdGj73Y3SoC6FL8UWEJxy51",
+    "ACCA": "https://drive.google.com/uc?export=view&id=1-diy5YsO0TdGj73Y3SoC6FL8UWEJxy51"
 }
 
 # 3. BACKGROUND FETCH
@@ -37,17 +37,32 @@ st.set_page_config(page_title="Flux | Portal", layout="wide")
 
 st.markdown(f"""
 <style>
+    /* Global Background */
     .stApp {{ background-image: url("{bg_url}"); background-size: cover; background-attachment: fixed; }}
+    
+    /* Force text to white for readability against dark backgrounds */
+    h1, h2, h3, p, span, label, .stMarkdown {{
+        color: white !important;
+    }}
+
+    /* Login Box (Keeps white background for contrast) */
     .login-box {{
         background-color: white; padding: 40px; border-radius: 15px;
         box-shadow: 0px 10px 40px rgba(0,0,0,0.4); max-width: 450px; margin: auto;
         text-align: center;
     }}
+    .login-box h1, .login-box h2, .login-box h3, .login-box p, .login-box label {{
+        color: black !important;
+    }}
+    
     .flux-box {{ 
-        background-color: #000; color: #fff; padding: 15px 30px; border-radius: 8px;
+        background-color: #000; color: #fff !important; padding: 15px 30px; border-radius: 8px;
         font-family: "Comic Sans MS", cursive; font-weight: bold; font-size: 2.5em;
         display: inline-block; margin-bottom: 30px;
     }}
+    
+    /* Fixes Search Bar Label color */
+    .stTextInput label {{ color: white !important; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -94,7 +109,6 @@ if role == "Administrator":
     prog = st.text_input("Course Name")
     file = st.file_uploader("Upload CSV")
     if file and st.button("Upload"):
-        # Handle both CSV and XLSX to be safe
         df = pd.read_excel(file) if "xlsx" in file.name else pd.read_csv(file)
         df = df.replace({np.nan: None})
         for _, row in df.iterrows():
@@ -110,37 +124,30 @@ if role == "Administrator":
 else:
     st.title("My Learning Path")
 
-    # 1. SEARCH BAR (Moved to top)
+    # 1. SEARCH BAR (At the top)
     search = st.text_input("Search Database (e.g., ACCA, Computer Science)")
     
     st.write("---")
 
-    # 2. NATIVE HARDCODED PLAYLISTS
+    # 2. FOUNDATIONAL COURSES (Computer Science & ACCA)
     st.subheader("Foundation Courses")
     f1, f2 = st.columns(2)
     with f1:
-        st.video("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-        st.caption("Foundation Playlist 1")
+        st.image(COURSE_TILES["Computer Science"], caption="Computer Science", use_container_width=True)
+        # You can add a default playlist video here if desired
+        st.video("https://www.youtube.com/watch?v=dQw4w9WgXcQ") 
     with f2:
+        st.image(COURSE_TILES["ACCA"], caption="ACCA", use_container_width=True)
+        # You can add a default playlist video here if desired
         st.video("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-        st.caption("Foundation Playlist 2")
 
     st.write("---")
 
     # 3. DYNAMIC DATABASE CONTENT
     if search:
-        # Show Hardcoded Tiles if matched exactly (ignoring case)
-        match_found = False
-        for key in COURSE_TILES:
-            if key.lower() in search.lower():
-                st.image(COURSE_TILES[key], caption=f"{key} Dashboard", use_container_width=True)
-                match_found = True
-        
-        # Fetch from Supabase
         res = supabase.table("materials").select("*").ilike("course_program", f"%{search}%").execute()
         if res.data:
             df = pd.DataFrame(res.data)
-            # Group by program to keep it organized
             for program in df['course_program'].unique():
                 st.subheader(f"Program: {program}")
                 prog_df = df[df['course_program'] == program]
@@ -150,7 +157,7 @@ else:
                         with st.expander(f"Week {item['week']}: {item['course_name']}"):
                             if item.get('video_url'): st.video(item['video_url'])
                             if item.get('notes_url'): st.link_button("View Notes", item['notes_url'])
-        elif not match_found:
+        else:
             st.info("No matching results found in the database.")
     else:
         st.info("Enter a course name above to view modules.")
