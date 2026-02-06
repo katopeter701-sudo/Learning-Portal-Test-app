@@ -86,31 +86,37 @@ if not st.session_state.logged_in:
     st.stop()
 
 # 6. MAIN NAVIGATION
-role = st.sidebar.radio("Navigation", ["📖 Learning Center", "🛠 Administrator"])
+role = st.sidebar.radio("Navigation", ["Learning Center", "Administrator"])
 
-if role == "🛠 Administrator":
+if role == "Administrator":
     if st.sidebar.text_input("Password", type="password") != "flux": st.stop()
     st.header("Admin Console")
-    # Bulk Upload Logic
     prog = st.text_input("Course Name")
     file = st.file_uploader("Upload CSV")
     if file and st.button("Upload"):
-        df = pd.read_csv(file)
+        # Handle both CSV and XLSX to be safe
+        df = pd.read_excel(file) if "xlsx" in file.name else pd.read_csv(file)
+        df = df.replace({np.nan: None})
         for _, row in df.iterrows():
             supabase.table("materials").insert({
                 "course_program": prog,
-                "course_name": row.get('Topic Covered'),
-                "week": row.get('Week'),
-                "video_url": row.get('Embeddable YouTube Video Link'),
-                "notes_url": row.get('Link to Google docs Document')
+                "course_name": str(row.get('Topic Covered', 'No Title')),
+                "week": int(pd.to_numeric(row.get('Week', 1), errors='coerce') or 1),
+                "video_url": str(row.get('Embeddable YouTube Video Link', '')),
+                "notes_url": str(row.get('Link to Google docs Document', ''))
             }).execute()
         st.success("Uploaded!")
 
 else:
-    st.title("🌊 My Learning Path")
+    st.title("My Learning Path")
 
-    # Native Hardcoded Playlists
-    st.subheader("🚀 Foundation Courses")
+    # 1. SEARCH BAR (Moved to top)
+    search = st.text_input("Search Database (e.g., ACCA, Computer Science)")
+    
+    st.write("---")
+
+    # 2. NATIVE HARDCODED PLAYLISTS
+    st.subheader("Foundation Courses")
     f1, f2 = st.columns(2)
     with f1:
         st.video("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
@@ -120,18 +126,31 @@ else:
         st.caption("Foundation Playlist 2")
 
     st.write("---")
-    search = st.text_input("🔍 Search Database (e.g., ACCA, Computer Science)")
 
+    # 3. DYNAMIC DATABASE CONTENT
     if search:
-        # Show Hardcoded Tiles if matched
-        if search in COURSE_TILES:
-            st.image(COURSE_TILES[search], caption=f"{search} Dashboard", use_container_width=True)
+        # Show Hardcoded Tiles if matched exactly (ignoring case)
+        match_found = False
+        for key in COURSE_TILES:
+            if key.lower() in search.lower():
+                st.image(COURSE_TILES[key], caption=f"{key} Dashboard", use_container_width=True)
+                match_found = True
         
         # Fetch from Supabase
         res = supabase.table("materials").select("*").ilike("course_program", f"%{search}%").execute()
         if res.data:
             df = pd.DataFrame(res.data)
-            for _, item in df.iterrows():
-                with st.expander(f"Week {item['week']}: {item['course_name']}"):
-                    if item['video_url']: st.video(item['video_url'])
-                    if item['notes_url']: st.link_button("View Notes", item['notes_url'])
+            # Group by program to keep it organized
+            for program in df['course_program'].unique():
+                st.subheader(f"Program: {program}")
+                prog_df = df[df['course_program'] == program]
+                cols = st.columns(3)
+                for idx, item in enumerate(prog_df.sort_values('week').to_dict('records')):
+                    with cols[idx % 3]:
+                        with st.expander(f"Week {item['week']}: {item['course_name']}"):
+                            if item.get('video_url'): st.video(item['video_url'])
+                            if item.get('notes_url'): st.link_button("View Notes", item['notes_url'])
+        elif not match_found:
+            st.info("No matching results found in the database.")
+    else:
+        st.info("Enter a course name above to view modules.")
