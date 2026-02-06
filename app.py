@@ -21,7 +21,6 @@ if 'page' not in st.session_state: st.session_state.page = "selector"
 if 'current_course' not in st.session_state: st.session_state.current_course = None
 if 'role' not in st.session_state: st.session_state.role = "Learning Center"
 
-# FIXED IMAGE TILES: Direct Download Format
 COURSE_TILES = {
     "Computer Science": "https://drive.google.com/uc?export=download&id=1-diy5YsO0TdGj73Y3SoC6FL8UWEJxy51",
     "ACCA": "https://drive.google.com/uc?export=download&id=1-diy5YsO0TdGj73Y3SoC6FL8UWEJxy51"
@@ -43,11 +42,13 @@ st.markdown(f"""
     
     h1, h2, h3, p, span, label, .stMarkdown, .stSubheader {{ color: white !important; }}
 
-    /* Sidebar Navigation Styling */
-    [data-testid="stSidebar"] {{ background-color: rgba(0, 0, 0, 0.7) !important; }}
-    [data-testid="stSidebar"] .stText, [data-testid="stSidebar"] p, [data-testid="stSidebar"] span {{ color: white !important; }}
+    /* Sidebar Navigation Tiles - Black Text */
+    [data-testid="stSidebar"] button div p {{
+        color: black !important;
+        font-weight: bold;
+    }}
     
-    /* Login/Signup Box */
+    /* Login/Signup Box Styling */
     .login-box {{
         background-color: white; padding: 40px; border-radius: 15px;
         box-shadow: 0px 10px 40px rgba(0,0,0,0.4); max-width: 450px; margin: auto;
@@ -55,7 +56,24 @@ st.markdown(f"""
     }}
     .login-box h1, .login-box h2, .login-box h3, .login-box p, .login-box label {{ color: black !important; }}
     
-    /* Small Black Hints (Placeholders) */
+    /* Glassy Buttons for Login Page */
+    .login-box button {{
+        background-color: rgba(255, 255, 255, 0.1) !important;
+        border: 1px solid rgba(0, 0, 0, 0.2) !important;
+        color: black !important;
+        transition: 0.3s;
+    }}
+    .login-box button:hover {{
+        background-color: rgba(0, 0, 0, 0.05) !important;
+        border: 1px solid black !important;
+    }}
+
+    /* Home Page Buttons - Black Hints/Text */
+    div[st-sidebar] button, div.stButton button {{
+        color: black !important;
+    }}
+
+    /* Small Black Placeholder Hints */
     input::placeholder {{
         color: black !important;
         font-size: 11px !important;
@@ -88,7 +106,7 @@ if not st.session_state.logged_in:
         elif st.session_state.page == "signup":
             name = st.text_input("Full Name", placeholder="enter your full name")
             email = st.text_input("Email", placeholder="enter your email address")
-            if st.button("Create Account", use_container_width=True):
+            if st.button("Create Account", key="btn_create", use_container_width=True):
                 supabase.table("users").insert({"full_name": name, "email": email}).execute()
                 st.success("Success! Please Login.")
                 st.session_state.page = "login"; st.rerun()
@@ -96,7 +114,7 @@ if not st.session_state.logged_in:
 
         elif st.session_state.page == "login":
             u_email = st.text_input("Email", placeholder="enter your registered email")
-            if st.button("Login", use_container_width=True):
+            if st.button("Login", key="btn_login_final", use_container_width=True):
                 user = supabase.table("users").select("*").eq("email", u_email).execute()
                 if user.data:
                     st.session_state.user_type = "kiu" if user.data[0].get('is_kiu_student') else "public"
@@ -128,7 +146,7 @@ if role == "Administrator":
     st.header("Admin Console")
     prog = st.text_input("Course Name")
     file = st.file_uploader("Upload CSV")
-    if file and st.button("Upload"):
+    if file and st.button("Upload", key="admin_upload"):
         df = pd.read_excel(file) if "xlsx" in file.name else pd.read_csv(file)
         df = df.replace({np.nan: None})
         for _, row in df.iterrows():
@@ -144,14 +162,13 @@ if role == "Administrator":
 # --- STUDENT PORTAL ---
 else:
     if st.session_state.current_course:
-        if st.button("← Back to Learning Path"):
+        if st.button("← Back to Learning Path", key="back_path"):
             st.session_state.current_course = None
             st.rerun()
         
         course_name = st.session_state.current_course
         st.title(f"Modules: {course_name}")
         
-        # FIX: Try/Except block to handle Supabase API Errors gracefully
         try:
             res = supabase.table("materials").select("*").eq("course_program", course_name).execute()
             if res.data:
@@ -167,20 +184,18 @@ else:
             else:
                 st.info("No detailed modules found for this course yet.")
         except Exception as e:
-            st.error("Database connection error. Please ensure the 'materials' table exists and RLS policies are set.")
+            st.error("Database connection error. Ensure RLS policies are set.")
 
     else:
         st.title("My Learning Path")
 
-        # 1. SEARCH BAR
         search = st.text_input("Search Database", placeholder="e.g. ACCA or Computer Science")
-        if search and st.button("Take on this Module"):
+        if search and st.button("Take on this Module", key="search_mod_btn"):
             st.session_state.current_course = search
             st.rerun()
         
         st.write("---")
 
-        # 2. FOUNDATION IMAGES
         st.subheader("Foundation Courses")
         i_col1, i_col2 = st.columns(2)
         with i_col1:
@@ -196,7 +211,6 @@ else:
 
         st.write("---")
 
-        # 3. YOUTUBE VIDEOS (Bottom)
         st.subheader("Introductory Overviews")
         v_col1, v_col2 = st.columns(2)
         with v_col1:
